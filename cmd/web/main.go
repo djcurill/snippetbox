@@ -1,28 +1,51 @@
 package main
 
 import (
-	"log"
+	"flag"
+	"log/slog"
 	"net/http"
+	"os"
 	"time"
 )
 
-const port string = "8080"
+type App struct {
+	logger *slog.Logger
+}
 
 func main() {
+	// cmd line flag parsing
+	var logLevel slog.Level
+
+	addr := flag.String("addr", ":8080", "HTTP network address")
+	flag.TextVar(&logLevel, "log-level", slog.LevelInfo, "logging level: debug, info, warn, error")
+
+	flag.Parse()
+
+	// logging setup
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: logLevel,
+	}))
+	app := &App{
+		logger: logger,
+	}
+
+	// server setup
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", home)
-	mux.HandleFunc("GET /snippet/view/{id}", snippetView)
-	mux.HandleFunc("GET /snippet/create", createSnippet)
-	mux.HandleFunc("POST /snippet/create", createSnippetPost)
+	mux.Handle("GET /static/", http.StripPrefix("/static", http.FileServer(http.Dir("./assets/static/"))))
+	mux.HandleFunc("GET /{$}", app.home)
+	mux.HandleFunc("GET /snippet/view/{id}", app.snippetView)
+	mux.HandleFunc("GET /snippet/create", app.createSnippet)
+	mux.HandleFunc("POST /snippet/create", app.createSnippetPost)
 
 	server := http.Server{
-		Addr:        ":" + port,
+		Addr:        *addr,
 		ReadTimeout: 5 * time.Second,
 		IdleTimeout: 5 * time.Second,
 		Handler:     mux,
 	}
 
-	log.Print("Starting server on port: ", port)
+	logger.Info("Starting http server", "addr", *addr)
 	err := server.ListenAndServe()
-	log.Fatal(err)
+	logger.Error(err.Error())
+	os.Exit(1)
 }

@@ -3,32 +3,42 @@ package main
 import (
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
 	"strconv"
 )
 
 // Create a home path for the webpages
-func home(w http.ResponseWriter, r *http.Request) {
+func (app *App) home(w http.ResponseWriter, r *http.Request) {
 	// Add a custom header indicating the backend server
 	w.Header().Add("Server", "Go")
 
-	ts, err := template.ParseFiles("./assets/html/pages/home.tmpl")
+	// We must define base first, then home. The base template
+	// references other named templates defined in subsequent .gohtml
+	// files
+	files := []string{
+		"./assets/html/base.gohtml",
+		"./assets/html/pages/home.gohtml",
+		"./assets/html/partials/nav.gohtml",
+		"./assets/html/none.gohtml",
+	}
+
+	ts, err := template.ParseFiles(files...)
 	if err != nil {
-		log.Print(err.Error())
+		app.logger.Error(err.Error())
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
-	err = ts.Execute(w, nil)
+
+	err = ts.ExecuteTemplate(w, "base", nil)
 	if err != nil {
-		log.Print(err.Error())
+		app.logger.Error(err.Error())
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 }
 
 // Snippet view
-func snippetView(w http.ResponseWriter, r *http.Request) {
+func (app *App) snippetView(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil || id < 1 {
 		http.NotFound(w, r)
@@ -38,12 +48,12 @@ func snippetView(w http.ResponseWriter, r *http.Request) {
 }
 
 // Create snippet
-func createSnippet(w http.ResponseWriter, r *http.Request) {
+func (app *App) createSnippet(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Display a form for creating a snippet")
 }
 
 // POST endpoint for creating the snipper
-func createSnippetPost(w http.ResponseWriter, r *http.Request) {
+func (app *App) createSnippetPost(w http.ResponseWriter, r *http.Request) {
 	// Status code 201 to indicate content has been created
 	w.WriteHeader(http.StatusCreated)
 
