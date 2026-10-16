@@ -19,20 +19,17 @@ func (app *App) home(w http.ResponseWriter, r *http.Request) {
 		"./assets/html/base.gohtml",
 		"./assets/html/pages/home.gohtml",
 		"./assets/html/partials/nav.gohtml",
-		"./assets/html/none.gohtml",
 	}
 
 	ts, err := template.ParseFiles(files...)
 	if err != nil {
-		app.logger.Error(err.Error())
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		app.internalServerError(w, r, err)
 		return
 	}
 
 	err = ts.ExecuteTemplate(w, "base", nil)
 	if err != nil {
-		app.logger.Error(err.Error())
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		app.internalServerError(w, r, err)
 		return
 	}
 }
@@ -41,7 +38,7 @@ func (app *App) home(w http.ResponseWriter, r *http.Request) {
 func (app *App) snippetView(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil || id < 1 {
-		http.NotFound(w, r)
+		app.clientError(w, http.StatusNotFound)
 		return
 	}
 	fmt.Fprintf(w, "View id is %d", id)
