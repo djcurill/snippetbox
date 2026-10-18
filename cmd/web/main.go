@@ -29,19 +29,11 @@ func main() {
 		logger: logger,
 	}
 
-	// server setup
-	mux := http.NewServeMux()
-	mux.Handle("GET /static/", http.StripPrefix("/static", http.FileServer(http.Dir("./assets/static/"))))
-	mux.HandleFunc("GET /{$}", app.home)
-	mux.HandleFunc("GET /snippet/view/{id}", app.snippetView)
-	mux.HandleFunc("GET /snippet/create", app.createSnippet)
-	mux.HandleFunc("POST /snippet/create", app.createSnippetPost)
-
 	server := http.Server{
 		Addr:        *addr,
 		ReadTimeout: 5 * time.Second,
 		IdleTimeout: 5 * time.Second,
-		Handler:     mux,
+		Handler:     app.routes(),
 	}
 
 	logger.Info("Starting http server", "addr", *addr)

@@ -6,7 +6,7 @@ import "net/http"
 // internal error
 func (app *App) internalServerError(w http.ResponseWriter, r *http.Request, err error) {
 	method := r.Method
-	path := r.URL.Path
+	path := r.URL.RequestURI()
 	app.logger.Error(err.Error(), "method", method, "path", path)
 	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 }
