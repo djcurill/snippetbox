@@ -4,4 +4,6 @@ create table snippets (
 	content text not null,
 	created timestamptz not null,
 	expires timestamptz not null
-)
+);
+
+create index idx_snippets_created on snippets (created);

@@ -11,9 +11,11 @@ services:
     shm_size: 128mb
 
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_DB: ${POSTGRES_DB:-snippetbox}
+      SNIPPET_DB_USER: ${SNIPPET_DB_USER:-web}
+      SNIPPET_DB_PASSWORD: ${SNIPPET_DB_PASSWORD:?SNIPPET_DB_PASSWORD is required}
 
     volumes:
       - ./scripts/db_init:/docker-entrypoint-initdb.d:ro
