@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	"html/template"
 	"log/slog"
 	"net/http"
 	"os"
@@ -12,9 +12,10 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" driver
 )
 
-type App struct {
-	logger   *slog.Logger
-	snippets *models.SnippetModel
+type app struct {
+	logger        *slog.Logger
+	snippets      *models.SnippetModel
+	templateCache map[string]*template.Template
 }
 
 func main() {
@@ -31,6 +32,7 @@ func main() {
 		Level: logLevel,
 	}))
 
+	// create db connection, defer close
 	db, err := openDB("pgx", dsn())
 	if err != nil {
 		logger.Error(err.Error())
@@ -39,16 +41,20 @@ func main() {
 	defer db.Close()
 	logger.Info("app connected to db successfully")
 
-	app := &App{
-		logger:   logger,
-		snippets: &models.SnippetModel{DB: db},
-	}
-	id, err := app.snippets.Insert("testing", "1,2,3", 7)
+	// parse templates and cache
+	templates, err := newTemplateCache()
 	if err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)
 	}
-	fmt.Println(id)
+
+	// central app data structure for passing logger and db
+	// connection utils
+	app := &app{
+		logger:        logger,
+		snippets:      &models.SnippetModel{DB: db},
+		templateCache: templates,
+	}
 
 	server := http.Server{
 		Addr:        *addr,

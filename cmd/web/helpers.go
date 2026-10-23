@@ -1,16 +1,18 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
-	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" driver
 	"net/http"
 	"os"
+
+	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" driver
 )
 
 // serverInternalError is a helper method for returning a 500 status
 // internal error
-func (app *App) internalServerError(w http.ResponseWriter, r *http.Request, err error) {
+func (app *app) internalServerError(w http.ResponseWriter, r *http.Request, err error) {
 	method := r.Method
 	path := r.URL.RequestURI()
 	app.logger.Error(err.Error(), "method", method, "path", path)
@@ -18,8 +20,27 @@ func (app *App) internalServerError(w http.ResponseWriter, r *http.Request, err 
 }
 
 // Informs the client when an invalid request was made
-func (app *App) clientError(w http.ResponseWriter, status int) {
+func (app *app) clientError(w http.ResponseWriter, status int) {
 	http.Error(w, http.StatusText(status), status)
+}
+
+func (app *app) render(w http.ResponseWriter, r *http.Request, page string, status int, data templateData) error {
+
+	ts, ok := app.templateCache[page]
+	if !ok {
+		return fmt.Errorf("unable to retrieve %s from template cache", page)
+	}
+
+	buf := new(bytes.Buffer)
+	err := ts.ExecuteTemplate(buf, "base", data)
+	if err != nil {
+		return fmt.Errorf("error executing template for %s", page)
+	}
+
+	w.WriteHeader(status)
+	_, err = buf.WriteTo(w)
+
+	return err
 }
 
 func getEnv(key, fallback string) string {

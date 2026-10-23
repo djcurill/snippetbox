@@ -1,33 +1,26 @@
 package main
 
 import (
+	"errors"
 	"fmt"
-	"html/template"
 	"net/http"
 	"strconv"
+
+	"github.com/djcurill/snippetbox/internal/models"
 )
 
-// Create a home path for the webpages
-func (app *App) home(w http.ResponseWriter, r *http.Request) {
-	// Add a custom header indicating the backend server
-	w.Header().Add("Server", "Go")
-
-	// We must define base first, then home. The base template
-	// references other named templates defined in subsequent .gohtml
-	// files
-	files := []string{
-		"./assets/html/base.gohtml",
-		"./assets/html/pages/home.gohtml",
-		"./assets/html/partials/nav.gohtml",
-	}
-
-	ts, err := template.ParseFiles(files...)
+// Create a home pathfor the webpages
+func (app *app) home(w http.ResponseWriter, r *http.Request) {
+	snippets, err := app.snippets.Latest()
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
 
-	err = ts.ExecuteTemplate(w, "base", nil)
+	data := app.newTemplateData()
+	data.Snippets = snippets
+
+	err = app.render(w, r, "home.gohtml", http.StatusOK, data)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -35,25 +28,50 @@ func (app *App) home(w http.ResponseWriter, r *http.Request) {
 }
 
 // Snippet view
-func (app *App) snippetView(w http.ResponseWriter, r *http.Request) {
+func (app *app) snippetView(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil || id < 1 {
 		app.clientError(w, http.StatusNotFound)
 		return
 	}
-	fmt.Fprintf(w, "View id is %d", id)
+	snippet, err := app.snippets.Get(id)
+	if err != nil {
+		switch {
+		case errors.Is(err, models.ErrNoRecord):
+			http.NotFound(w, r)
+		default:
+			app.internalServerError(w, r, err)
+		}
+		return
+	}
+
+	// populate templateData
+	data := app.newTemplateData()
+	data.Snippet = snippet
+
+	err = app.render(w, r, "snippetView.gohtml", http.StatusOK, data)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
 }
 
 // Create snippet
-func (app *App) createSnippet(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Display a form for creating a snippet")
+func (app *app) createSnippet(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "diplay a view for creating a snippet")
 }
 
 // POST endpoint for creating the snipper
-func (app *App) createSnippetPost(w http.ResponseWriter, r *http.Request) {
+func (app *app) createSnippetPost(w http.ResponseWriter, r *http.Request) {
 	// Status code 201 to indicate content has been created
-	w.WriteHeader(http.StatusCreated)
+	title := "O snail"
+	content := "O snail\nClimb Mount Fuji,\nBut slowly, slowly!\n\n– Kobayashi Issa"
+	expires := 7
+	id, err := app.snippets.Insert(title, content, expires)
+	if err != nil {
+		app.internalServerError(w, r, err)
+	}
 
-	// Write snippet
-	fmt.Fprintf(w, "Creating snippet...")
+	// Redirect to the view of the snippet after it has been created
+	http.Redirect(w, r, fmt.Sprintf("/snippet/view/%d", id), http.StatusSeeOther)
 }
