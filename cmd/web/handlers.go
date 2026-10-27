@@ -3,11 +3,21 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/djcurill/snippetbox/internal/models"
+	"github.com/djcurill/snippetbox/internal/validators"
 	"net/http"
 	"strconv"
-
-	"github.com/djcurill/snippetbox/internal/models"
 )
+
+// use go-playground for automatic form parsing.
+// tags indicate which form fields map to struct
+// attributes. a "-" mean to ignore this value
+type snippetCreateForm struct {
+	Title                string `form:"title"`
+	Content              string `form:"content"`
+	Expires              int    `form:"expires"`
+	validators.Validator `form:"-"`
+}
 
 // Create a home pathfor the webpages
 func (app *app) home(w http.ResponseWriter, r *http.Request) {
@@ -58,18 +68,47 @@ func (app *app) snippetView(w http.ResponseWriter, r *http.Request) {
 
 // Create snippet
 func (app *app) createSnippet(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "diplay a view for creating a snippet")
+	data := app.newTemplateData()
+	data.Form = snippetCreateForm{
+		Expires: 365,
+	}
+	err := app.render(w, r, "create.gohtml", http.StatusOK, data)
+	if err != nil {
+		app.internalServerError(w, r, err)
+	}
 }
 
 // POST endpoint for creating the snipper
 func (app *app) createSnippetPost(w http.ResponseWriter, r *http.Request) {
-	// Status code 201 to indicate content has been created
-	title := "O snail"
-	content := "O snail\nClimb Mount Fuji,\nBut slowly, slowly!\n\n– Kobayashi Issa"
-	expires := 7
-	id, err := app.snippets.Insert(title, content, expires)
+
+	var form snippetCreateForm
+	err := app.decodeForm(r, &form)
+
+	if err != nil {
+		app.logger.Error("error parsing form", "err", err.Error())
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+
+	form.CheckField(form.NotBlank(form.Title), "title", "this field cannot be empty")
+	form.CheckField(form.MaxChars(form.Title, 100), "title", "this field cannot be longer than 100 chars")
+	form.CheckField(form.NotBlank(form.Content), "content", "this field cannot be empty")
+	form.CheckField(validators.PermittedValue(form.Expires, 1, 7, 365), "expires", "this field must equal 1,7 or 365")
+
+	if !form.Valid() {
+		data := app.newTemplateData()
+		data.Form = form
+		err = app.render(w, r, "create.gohtml", http.StatusUnprocessableEntity, data)
+		if err != nil {
+			app.internalServerError(w, r, err)
+		}
+		return
+	}
+
+	id, err := app.snippets.Insert(form.Title, form.Content, form.Expires)
 	if err != nil {
 		app.internalServerError(w, r, err)
+		return
 	}
 
 	// Redirect to the view of the snippet after it has been created

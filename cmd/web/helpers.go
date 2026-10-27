@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
 
+	"github.com/go-playground/form/v4"
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" driver
 )
 
@@ -22,6 +24,22 @@ func (app *app) internalServerError(w http.ResponseWriter, r *http.Request, err 
 // Informs the client when an invalid request was made
 func (app *app) clientError(w http.ResponseWriter, status int) {
 	http.Error(w, http.StatusText(status), status)
+}
+
+func (app *app) decodeForm(r *http.Request, dst any) error {
+	err := r.ParseForm()
+	if err != nil {
+		return err
+	}
+
+	err = app.decoder.Decode(dst, r.PostForm)
+	if err != nil {
+		if _, ok := errors.AsType[*form.InvalidDecoderError](err); ok {
+			panic(err)
+		}
+		return err
+	}
+	return nil
 }
 
 func (app *app) render(w http.ResponseWriter, r *http.Request, page string, status int, data templateData) error {
