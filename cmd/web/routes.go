@@ -7,13 +7,20 @@ import (
 )
 
 func (app *app) routes() http.Handler {
-	// server setup
+	// initialize new server mux
 	mux := http.NewServeMux()
-	mux.Handle("GET /static/", http.StripPrefix("/static", http.FileServer(http.Dir("./assets/static/"))))
-	mux.HandleFunc("GET /{$}", app.home)
-	mux.HandleFunc("GET /snippet/view/{id}", app.snippetView)
-	mux.HandleFunc("GET /snippet/create", app.createSnippet)
-	mux.HandleFunc("POST /snippet/create", app.createSnippetPost)
+
+	// setup static file server
+	fileServer := http.FileServer(http.Dir("./assets/static/"))
+	mux.Handle("GET /static/", http.StripPrefix("/static", fileServer))
+
+	// setup dynamic routes
+	dynamic := alice.New(app.sessionManager.LoadAndSave)
+
+	mux.Handle("GET /{$}", dynamic.ThenFunc(app.home))
+	mux.Handle("GET /snippet/view/{id}", dynamic.ThenFunc(app.snippetView))
+	mux.Handle("GET /snippet/create", dynamic.ThenFunc(app.createSnippet))
+	mux.Handle("POST /snippet/create", dynamic.ThenFunc(app.createSnippetPost))
 
 	// syntactic sugar for chaining middleware
 	chain := alice.New(app.recoverPanic, app.logRequest, commonHeaders)

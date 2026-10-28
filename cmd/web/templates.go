@@ -2,6 +2,7 @@ package main
 
 import (
 	"html/template"
+	"net/http"
 	"path/filepath"
 	"time"
 
@@ -15,6 +16,7 @@ type templateData struct {
 	Snippet     models.Snippet
 	Snippets    []models.Snippet
 	Form        any
+	Flash       string
 }
 
 // custom template functions can accept any sort of inputs
@@ -24,9 +26,10 @@ var tmplFunctions = template.FuncMap{
 	"humanDate": humanDate,
 }
 
-func (app *app) newTemplateData() templateData {
+func (app *app) newTemplateData(r *http.Request) templateData {
 	return templateData{
 		CurrentYear: time.Now().Year(),
+		Flash:       app.sessionManager.PopString(r.Context(), "flash"),
 	}
 }
 

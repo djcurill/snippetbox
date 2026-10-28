@@ -8,16 +8,19 @@ import (
 	"os"
 	"time"
 
+	"github.com/alexedwards/scs/postgresstore"
+	"github.com/alexedwards/scs/v2"
 	"github.com/djcurill/snippetbox/internal/models"
 	"github.com/go-playground/form/v4"
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" driver
 )
 
 type app struct {
-	logger        *slog.Logger
-	snippets      *models.SnippetModel
-	templateCache map[string]*template.Template
-	decoder       *form.Decoder
+	logger         *slog.Logger
+	snippets       *models.SnippetModel
+	templateCache  map[string]*template.Template
+	decoder        *form.Decoder
+	sessionManager *scs.SessionManager
 }
 
 func main() {
@@ -50,13 +53,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	// intilialize sessions manager
+	sessionManager := scs.New()
+	sessionManager.Store = postgresstore.New(db)
+	sessionManager.Lifetime = 12 * time.Hour // expire after 12h
+	sessionManager.IdleTimeout = 20 * time.Minute
+	// cookies will only be sent to a users browser when using https
+	sessionManager.Cookie.Secure = true
+
 	// central app data structure for passing logger and db
 	// connection utils
 	app := &app{
-		logger:        logger,
-		snippets:      &models.SnippetModel{DB: db},
-		templateCache: templates,
-		decoder:       form.NewDecoder(),
+		logger:         logger,
+		snippets:       &models.SnippetModel{DB: db},
+		templateCache:  templates,
+		decoder:        form.NewDecoder(),
+		sessionManager: sessionManager,
 	}
 
 	server := http.Server{
@@ -64,10 +76,11 @@ func main() {
 		ReadTimeout: 5 * time.Second,
 		IdleTimeout: 5 * time.Second,
 		Handler:     app.routes(),
+		ErrorLog:    slog.NewLogLogger(logger.Handler(), logLevel),
 	}
 
 	logger.Info("Starting http server", "addr", *addr)
-	err = server.ListenAndServe()
+	err = server.ListenAndServeTLS("./assets/tls/cert.pem", "./assets/tls/key.pem")
 	logger.Error(err.Error())
 	os.Exit(1)
 }

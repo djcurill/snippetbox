@@ -27,7 +27,7 @@ func (app *app) home(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := app.newTemplateData()
+	data := app.newTemplateData(r)
 	data.Snippets = snippets
 
 	err = app.render(w, r, "home.gohtml", http.StatusOK, data)
@@ -56,7 +56,7 @@ func (app *app) snippetView(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// populate templateData
-	data := app.newTemplateData()
+	data := app.newTemplateData(r)
 	data.Snippet = snippet
 
 	err = app.render(w, r, "snippetView.gohtml", http.StatusOK, data)
@@ -68,10 +68,11 @@ func (app *app) snippetView(w http.ResponseWriter, r *http.Request) {
 
 // Create snippet
 func (app *app) createSnippet(w http.ResponseWriter, r *http.Request) {
-	data := app.newTemplateData()
+	data := app.newTemplateData(r)
 	data.Form = snippetCreateForm{
 		Expires: 365,
 	}
+
 	err := app.render(w, r, "create.gohtml", http.StatusOK, data)
 	if err != nil {
 		app.internalServerError(w, r, err)
@@ -96,7 +97,7 @@ func (app *app) createSnippetPost(w http.ResponseWriter, r *http.Request) {
 	form.CheckField(validators.PermittedValue(form.Expires, 1, 7, 365), "expires", "this field must equal 1,7 or 365")
 
 	if !form.Valid() {
-		data := app.newTemplateData()
+		data := app.newTemplateData(r)
 		data.Form = form
 		err = app.render(w, r, "create.gohtml", http.StatusUnprocessableEntity, data)
 		if err != nil {
@@ -110,6 +111,10 @@ func (app *app) createSnippetPost(w http.ResponseWriter, r *http.Request) {
 		app.internalServerError(w, r, err)
 		return
 	}
+
+	// if there is no existing session, a new one will be created
+	// this is handled by the middleware
+	app.sessionManager.Put(r.Context(), "flash", "Snippet created successfully!")
 
 	// Redirect to the view of the snippet after it has been created
 	http.Redirect(w, r, fmt.Sprintf("/snippet/view/%d", id), http.StatusSeeOther)
