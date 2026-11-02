@@ -61,6 +61,10 @@ func (app *app) render(w http.ResponseWriter, r *http.Request, page string, stat
 	return err
 }
 
+func (app *app) isAuthenticated(r *http.Request) bool {
+	return app.sessionManager.Exists(r.Context(), "authenticatedUserId")
+}
+
 func getEnv(key, fallback string) string {
 	if value := os.Getenv(key); value != "" {
 		return value

@@ -15,14 +15,22 @@ func (app *app) routes() http.Handler {
 	mux.Handle("GET /static/", http.StripPrefix("/static", fileServer))
 
 	// setup dynamic routes
-	dynamic := alice.New(app.sessionManager.LoadAndSave)
+	dynamic := alice.New(app.sessionManager.LoadAndSave, app.requireCSRF)
 
 	mux.Handle("GET /{$}", dynamic.ThenFunc(app.home))
 	mux.Handle("GET /snippet/view/{id}", dynamic.ThenFunc(app.snippetView))
-	mux.Handle("GET /snippet/create", dynamic.ThenFunc(app.createSnippet))
-	mux.Handle("POST /snippet/create", dynamic.ThenFunc(app.createSnippetPost))
+	mux.Handle("GET /user/signup", dynamic.ThenFunc(app.userSignUp))
+	mux.Handle("POST /user/signup", dynamic.ThenFunc(app.userSignUpPost))
+	mux.Handle("GET /user/login", dynamic.ThenFunc(app.userLogin))
+	mux.Handle("POST /user/login", dynamic.ThenFunc(app.userLoginPost))
+
+	// pages that require authentication
+	protected := dynamic.Append(app.requireAuthentication)
+	mux.Handle("GET /snippet/create", protected.ThenFunc(app.createSnippet))
+	mux.Handle("POST /snippet/create", protected.ThenFunc(app.createSnippetPost))
+	mux.Handle("POST /user/logout", protected.ThenFunc(app.userLogoutPost))
 
 	// syntactic sugar for chaining middleware
-	chain := alice.New(app.recoverPanic, app.logRequest, commonHeaders)
-	return chain.Then(mux)
+	standard := alice.New(app.recoverPanic, app.logRequest, commonHeaders)
+	return standard.Then(mux)
 }

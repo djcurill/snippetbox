@@ -7,16 +7,19 @@ import (
 	"time"
 
 	"github.com/djcurill/snippetbox/internal/models"
+	"github.com/justinas/nosurf"
 )
 
 // template data struct to hold all elements
 // passed into html templates to render data dynamically
 type templateData struct {
-	CurrentYear int
-	Snippet     models.Snippet
-	Snippets    []models.Snippet
-	Form        any
-	Flash       string
+	CurrentYear     int
+	Snippet         models.Snippet
+	Snippets        []models.Snippet
+	Form            any
+	Flash           string
+	IsAuthenticated bool
+	CSRFToken       string
 }
 
 // custom template functions can accept any sort of inputs
@@ -28,8 +31,10 @@ var tmplFunctions = template.FuncMap{
 
 func (app *app) newTemplateData(r *http.Request) templateData {
 	return templateData{
-		CurrentYear: time.Now().Year(),
-		Flash:       app.sessionManager.PopString(r.Context(), "flash"),
+		CurrentYear:     time.Now().Year(),
+		Flash:           app.sessionManager.PopString(r.Context(), "flash"),
+		IsAuthenticated: app.isAuthenticated(r),
+		CSRFToken:       nosurf.Token(r),
 	}
 }
 

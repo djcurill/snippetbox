@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"html/template"
 	"log/slog"
@@ -18,6 +19,7 @@ import (
 type app struct {
 	logger         *slog.Logger
 	snippets       *models.SnippetModel
+	users          *models.UserModel
 	templateCache  map[string]*template.Template
 	decoder        *form.Decoder
 	sessionManager *scs.SessionManager
@@ -66,17 +68,39 @@ func main() {
 	app := &app{
 		logger:         logger,
 		snippets:       &models.SnippetModel{DB: db},
+		users:          &models.UserModel{DB: db},
 		templateCache:  templates,
 		decoder:        form.NewDecoder(),
 		sessionManager: sessionManager,
 	}
 
+	// tls settings
+	tlsCfg := &tls.Config{
+		MinVersion: tls.VersionTLS13,
+	}
+
+	// Idle timeout limits tell the server how long to keep a connection open (keep-alive)
+	// by keeping the connection open, we reduce latency because the client can reuse the same
+	// connection
+
+	// Read timeouts are time limits for reading from the client
+	// Read timeouts indicate how long to wait when reading a response before closing the connection.
+	// After 5 seconds since receiving headers, the connection is closed.
+
+	// Write timeouts are time limits for writing to the client
+	// Write timeouts will trigger when the time taken to write data exceeds a certain limit since
+	// when the client was first accepted. Write timeouts are typically longer than Read timesouts
+	// since read timeouts start counting when the first header is received
 	server := http.Server{
-		Addr:        *addr,
-		ReadTimeout: 5 * time.Second,
-		IdleTimeout: 5 * time.Second,
-		Handler:     app.routes(),
-		ErrorLog:    slog.NewLogLogger(logger.Handler(), logLevel),
+		Addr:         *addr,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  1 * time.Minute,
+		Handler:      app.routes(),
+		ErrorLog:     slog.NewLogLogger(logger.Handler(), logLevel),
+		TLSConfig:    tlsCfg,
+		// prevent a denial of service attack from a user sending too many headers in a single a request
+		MaxHeaderValueCount: 100,
 	}
 
 	logger.Info("Starting http server", "addr", *addr)
