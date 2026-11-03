@@ -95,7 +95,8 @@ func (app *app) requireAuthentication(next http.Handler) http.Handler {
 // all handlers wrappers with this middleware will include a cookie with a
 // CSRF token
 func (app *app) requireCSRF(next http.Handler) http.Handler {
-	csrfHandler := nosurf.New(next)
+	cop := http.NewCrossOriginProtection()
+	csrfHandler := nosurf.New(cop.Handler(next))
 	csrfHandler.SetBaseCookie(http.Cookie{
 		HttpOnly: true, // cannot be accessed by client side javascript
 		Path:     "/",  // apply to all paths
